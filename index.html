@@ -10,26 +10,24 @@
   <div class="container">
     <header class="hero">
       <h1>台股選股網站</h1>
-      <p class="subtitle">策略：量縮測底完成（版本 A）</p>
+      <p class="subtitle">每日台股全市場掃描系統</p>
     </header>
 
     <section class="card">
-      <h2>操作</h2>
-      <button id="runBtn">執行策略</button>
-      <p class="hint">按下後，系統會依照你設定的條件，從 Render API 抓出符合的股票。</p>
-      <div id="status" class="hint"></div>
+      <h2>選擇策略</h2>
+      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <button id="btnStrategy1">策略A：量縮測底完成</button>
+        <button id="btnStrategy2" style="background-color: #475569;">策略B：均線多頭排列</button>
+      </div>
+      <p class="hint">資料已由 GitHub Actions 在背景算好，點擊按鈕可「瞬間」切換選股結果。</p>
+      <div id="status" class="hint" style="color: #0f766e; font-weight: bold;"></div>
     </section>
 
     <section class="card">
-      <h2>策略條件</h2>
+      <h2>策略條件說明</h2>
       <ul class="rule-list">
-        <li>收盤價 > MA5</li>
-        <li>收盤價 > MA20</li>
-        <li>收盤價 > MA60</li>
-        <li>20 日最低收盤價 < MA20</li>
-        <li>成交量 > 500 張</li>
-        <li>收盤價 < MA200 × 1.4</li>
-        <li>MA200 連續 10 天上升</li>
+        <li><strong>策略A：</strong>收盤 > MA5/20/60、近20日低點 < MA20、量 > 500、收盤未偏離 200MA 太遠、200MA連10日上升</li>
+        <li><strong>策略B：</strong>收盤 > MA5 > MA20 > MA60，且成交量 > 1000張（測試用）</li>
       </ul>
     </section>
 
@@ -39,7 +37,7 @@
         <span id="resultCount" class="badge">尚未執行</span>
       </div>
 
-      <p id="metaInfo" class="hint">尚未更新資料</p>
+      <p id="metaInfo" class="hint">資料載入中...</p>
 
       <div class="table-wrap">
         <table>
@@ -58,7 +56,7 @@
           </thead>
           <tbody id="resultBody">
             <tr>
-              <td colspan="9" class="empty">尚未執行</td>
+              <td colspan="9" class="empty">尚未執行任何策略</td>
             </tr>
           </tbody>
         </table>
