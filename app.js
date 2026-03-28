@@ -1,5 +1,5 @@
 // 注意：等 Render 架好後，把這裡換成你真實的 Render 網址
-const API_URL = 'https://你的-render-app名稱.onrender.com/stocks';
+const API_URL = 'https://stock-backend-5ljo.onrender.com/stockss';
 
 async function runStrategy() {
   const tbody = document.getElementById('resultBody');
