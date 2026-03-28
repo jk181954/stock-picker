@@ -1,0 +1,36 @@
+name: Daily Stock Scanner
+
+on:
+  schedule:
+    # 這是 UTC 時間，08:30 等於台灣時間 16:30 (台股收盤後)
+    - cron: '30 8 * * 1-5' 
+  workflow_dispatch: # 允許你手動按按鈕測試
+
+permissions:
+  contents: write # 允許腳本把 json 寫回 Repo
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Python script
+        run: python update_stocks.py
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add stocks.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update stocks.json" && git push)
