@@ -1,14 +1,12 @@
 import requests
 import json
-import time
 import os
-from datetime import datetime, timedelta
+import time
+import yfinance as yf
+import pandas as pd
+from datetime import datetime
 
-FINMIND_TOKEN = os.getenv("FINMIND_TOKEN", "")
-
-def get_headers():
-    return {"Authorization": f"Bearer {FINMIND_TOKEN}"} if FINMIND_TOKEN else {}
-
+# 1. 抓取上市 + 上櫃清單
 def fetch_all_stock_list():
     stocks = []
     seen_codes = set()
@@ -37,118 +35,148 @@ def fetch_all_stock_list():
                     seen_codes.add(code)
     except Exception as e:
         print(f"上櫃清單失敗: {e}")
+
     return stocks
 
-def fetch_stock_data_with_retry(stock_id, start_date, max_retries=3):
-    url = "https://api.finmindtrade.com/api/v4/data"
-    params = {"dataset": "TaiwanStockPrice", "data_id": stock_id, "start_date": start_date}
-    for attempt in range(max_retries):
-        try:
-            res = requests.get(url, params=params, headers=get_headers(), timeout=10)
-            if res.status_code == 200:
-                data = res.json().get("data", [])
-                return sorted(data, key=lambda x: x["date"])
-            elif res.status_code in [429, 403]:
-                # 被嫌太快了，休息3秒再試
-                time.sleep(3)
-        except Exception:
-            time.sleep(1)
-    return []
-
-def moving_average(values, period):
-    if len(values) < period: return None
-    return sum(values[-period:]) / period
-
-def rolling_ma(values, period, count):
-    res = []
-    if len(values) < period + count - 1: return res
-    for i in range(count):
-        end = len(values) - count + i + 1
-        start = end - period
-        if start < 0: return []
-        res.append(sum(values[start:end]) / period)
-    return res
-
-def is_ma200_up_10days(closes):
-    ma_values = rolling_ma(closes, 200, 10)
-    if len(ma_values) < 10: return False
+def is_ma200_up_10days(ma200_series):
+    last_10 = ma200_series.tail(10).tolist()
+    if len(last_10) < 10 or pd.isna(last_10).any():
+        return False
     for i in range(1, 10):
-        if ma_values[i] <= ma_values[i - 1]: return False
+        if last_10[i] <= last_10[i-1]:
+            return False
     return True
-
-def process_stock(stock_rows, stock_info):
-    if len(stock_rows) < 220: return None
-    closes, volumes = [], []
-    for row in stock_rows:
-        try:
-            closes.append(float(row["close"]))
-            volumes.append(float(row["Trading_Volume"]))
-        except:
-            continue
-    if len(closes) < 220 or len(volumes) < 220: return None
-    close = closes[-1]
-    ma5 = moving_average(closes, 5)
-    ma20 = moving_average(closes, 20)
-    ma60 = moving_average(closes, 60)
-    ma200 = moving_average(closes, 200)
-    lowest_close_20 = min(closes[-20:])
-    volume = volumes[-1] / 1000
-    ma200_up_10days = is_ma200_up_10days(closes)
-    if None in [ma5, ma20, ma60, ma200]: return None
-    
-    return {
-        "code": stock_info["code"],
-        "name": stock_info["name"],
-        "market": stock_info["market"],
-        "close": round(close, 2),
-        "ma5": round(ma5, 2),
-        "ma20": round(ma20, 2),
-        "ma60": round(ma60, 2),
-        "ma200": round(ma200, 2),
-        "lowestClose20": round(lowest_close_20, 2),
-        "volume": round(volume, 2),
-        "ma200_up_10days": ma200_up_10days
-    }
 
 def main():
     print("=== 開始獲取台股清單 ===")
-    stocks = fetch_all_stock_list()
-    if not stocks:
+    stocks_info = fetch_all_stock_list()
+    
+    if not stocks_info:
         print("無法取得股票清單")
         return
 
-    print(f"共取得 {len(stocks)} 檔普通股。開始計算技術指標 (加速版)...")
-    start_date = (datetime.today() - timedelta(days=400)).strftime("%Y-%m-%d")
-    all_stocks_data = []
-    failed_count = 0
-    
-    for idx, stock in enumerate(stocks):
-        rows = fetch_stock_data_with_retry(stock["code"], start_date)
-        if not rows:
-            failed_count += 1
-            # 抓不到就稍微停一下下，避免連續報錯
-            time.sleep(0.5)
-            continue
-            
-        res = process_stock(rows, stock)
-        if res:
-            all_stocks_data.append(res)
-            
-        if (idx + 1) % 50 == 0:
-            print(f"進度: {idx+1} / {len(stocks)} 檔處理完成...")
-        
-        # 加速關鍵：每次只睡 0.3 秒
-        time.sleep(0.3)
+    print(f"共取得 {len(stocks_info)} 檔普通股。開始透過 yfinance 聰明批次下載...")
 
+    # 把股票代碼轉成 YF 格式
+    all_tickers = []
+    ticker_to_info = {}
+
+    for s in stocks_info:
+        suffix = ".TW" if s["market"] == "上市" else ".TWO"
+        yf_ticker = f"{s['code']}{suffix}"
+        all_tickers.append(yf_ticker)
+        ticker_to_info[yf_ticker] = s
+
+    all_stocks_data = []
+    checked_count = 0
+    failed_count = 0
+
+    # 聰明切塊：每次只問 20 檔，避免被 Yahoo 鎖 IP
+    batch_size = 20
+    
+    for i in range(0, len(all_tickers), batch_size):
+        batch_tickers = all_tickers[i:i + batch_size]
+        print(f"進度: 處理第 {i+1} 到 {i+len(batch_tickers)} 檔...")
+        
+        try:
+            # 使用 pandas datareader 核心的 yf.download
+            # threads=False 避免多線程引發連線阻擋
+            data = yf.download(
+                batch_tickers, 
+                period="1y", 
+                interval="1d", 
+                group_by="ticker", 
+                auto_adjust=False, 
+                prepost=False, 
+                threads=False, 
+                progress=False
+            )
+            
+            # 每批次要乖乖休息 2 秒，假裝是人類在查資料
+            time.sleep(2)
+            
+        except Exception as e:
+            print(f"批次下載失敗: {e}")
+            failed_count += len(batch_tickers)
+            time.sleep(5) # 被擋就睡久一點
+            continue
+
+        for ticker in batch_tickers:
+            checked_count += 1
+            info = ticker_to_info[ticker]
+            
+            try:
+                if len(batch_tickers) == 1:
+                    df = data.copy()
+                else:
+                    df = data[ticker].copy()
+                
+                # 排除沒有資料的爛股
+                if df.empty or 'Close' not in df.columns:
+                    continue
+
+                df = df.dropna(subset=['Close', 'Volume'])
+                
+                # 如果這檔股票剛上市不到 220 天，算不出 200MA，就跳過
+                if len(df) < 220:
+                    continue
+
+                close_series = df['Close']
+                volume_series = df['Volume']
+
+                ma5 = close_series.rolling(window=5).mean()
+                ma20 = close_series.rolling(window=20).mean()
+                ma60 = close_series.rolling(window=60).mean()
+                ma200 = close_series.rolling(window=200).mean()
+                
+                lowest_close_20 = close_series.rolling(window=20).min()
+
+                latest_close = close_series.iloc[-1]
+                # yfinance 的台股成交量通常是「股數」，所以除以 1000 變「張數」
+                latest_vol = volume_series.iloc[-1] / 1000 
+                
+                c_ma5 = ma5.iloc[-1]
+                c_ma20 = ma20.iloc[-1]
+                c_ma60 = ma60.iloc[-1]
+                c_ma200 = ma200.iloc[-1]
+                c_low20 = lowest_close_20.iloc[-2] 
+                
+                if pd.isna(c_ma5) or pd.isna(c_ma20) or pd.isna(c_ma60) or pd.isna(c_ma200):
+                    continue
+
+                ma200_up = is_ma200_up_10days(ma200)
+
+                all_stocks_data.append({
+                    "code": info["code"],
+                    "name": info["name"],
+                    "market": info["market"],
+                    "close": round(float(latest_close), 2),
+                    "ma5": round(float(c_ma5), 2),
+                    "ma20": round(float(c_ma20), 2),
+                    "ma60": round(float(c_ma60), 2),
+                    "ma200": round(float(c_ma200), 2),
+                    "lowestClose20": round(float(c_low20), 2),
+                    "volume": round(float(latest_vol), 2),
+                    "ma200_up_10days": ma200_up
+                })
+
+            except Exception:
+                failed_count += 1
+                pass
+
+    # 寫入 json
     output_data = {
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "total_valid_stocks": len(all_stocks_data),
         "stocks": all_stocks_data
     }
+
     with open("all_stocks_data.json", "w", encoding="utf-8") as f:
         json.dump(output_data, f, ensure_ascii=False, indent=2)
-    print(f"\n=== 掃描完成 ===")
-    print(f"總計掃描: {len(stocks)} 檔，失敗/無資料: {failed_count} 檔")
+    
+    print("\n=== 掃描完成 ===")
+    print(f"總計掃描: {checked_count} 檔")
+    print(f"無法解析 (無資料/下市/剛上市): {failed_count} 檔")
     print(f"成功儲存 {len(all_stocks_data)} 檔股票的技術指標至 all_stocks_data.json！")
 
 if __name__ == "__main__":
