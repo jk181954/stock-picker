@@ -1,0 +1,62 @@
+[
+  {
+    "code": "2330",
+    "name": "台積電",
+    "close": 980,
+    "ma5": 970,
+    "ma20": 950,
+    "ma60": 900,
+    "ma200": 800,
+    "lowestClose20": 930,
+    "volume": 25000,
+    "ma200_up_10days": true
+  },
+  {
+    "code": "2303",
+    "name": "聯電",
+    "close": 52,
+    "ma5": 50,
+    "ma20": 49,
+    "ma60": 48,
+    "ma200": 42,
+    "lowestClose20": 47,
+    "volume": 12000,
+    "ma200_up_10days": true
+  },
+  {
+    "code": "2317",
+    "name": "鴻海",
+    "close": 168,
+    "ma5": 165,
+    "ma20": 160,
+    "ma60": 155,
+    "ma200": 140,
+    "lowestClose20": 150,
+    "volume": 18000,
+    "ma200_up_10days": true
+  },
+  {
+    "code": "2615",
+    "name": "萬海",
+    "close": 76,
+    "ma5": 74,
+    "ma20": 77,
+    "ma60": 73,
+    "ma200": 65,
+    "lowestClose20": 70,
+    "volume": 8000,
+    "ma200_up_10days": false
+  },
+  {
+    "code": "2408",
+    "name": "南亞科",
+    "close": 68,
+    "ma5": 66,
+    "ma20": 64,
+    "ma60": 61,
+    "ma200": 54,
+    "lowestClose20": 60,
+    "volume": 9500,
+    "ma200_up_10days": true
+  }
+]
