@@ -32,6 +32,8 @@
         .market-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: white; }
         .badge-twse { background-color: #0288d1; }
         .badge-tpex { background-color: #f57c00; }
+        .old-data { background-color: #fff3cd !important; opacity: 0.7; }
+        .old-date { color: #856404; font-size: 11px; }
         .loading { text-align: center; font-size: 18px; color: #666; padding: 40px; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
         @media (max-width: 768px) { th, td { padding: 8px 5px; font-size: 14px; } .hide-on-mobile { display: none; } }
@@ -82,6 +84,7 @@
                 <th class="hide-on-mobile">市場</th>
                 <th>收盤價</th>
                 <th>成交量</th>
+                <th class="hide-on-mobile">資料日</th>
                 <th class="hide-on-mobile">5MA</th>
                 <th class="hide-on-mobile">20MA</th>
                 <th class="hide-on-mobile">60MA</th>
@@ -96,15 +99,15 @@
     <script>
         let allStocksData = [];
         let currentStrategy = 1;
+        const todayStr = new Date().toISOString().split('T')[0];
 
         function toggleExplanation() {
             const box = document.getElementById("strategy-explanation");
             box.style.display = (box.style.display === "none" || box.style.display === "") ? "block" : "none";
         }
 
-        function showDataDateWarning(dataDate) {
+        function showDataDateWarning(dataDate, todayUpdatedCount) {
             const warningEl = document.getElementById('data-date-info');
-            const todayStr = new Date().toISOString().split('T')[0];
 
             if (!dataDate) {
                 warningEl.innerHTML = '⚠️ 無法判斷資料交易日期';
@@ -113,10 +116,10 @@
             }
 
             if (dataDate === todayStr) {
-                warningEl.innerHTML = '✅ 資料為今天交易日';
+                warningEl.innerHTML = `✅ 資料為今天交易日 (更新 ${todayUpdatedCount || 0} 檔)`;
                 warningEl.className = 'data-date-warning today';
             } else {
-                warningEl.innerHTML = `⚠️ 資料為 ${dataDate} 交易日（非今日）`;
+                warningEl.innerHTML = `⚠️ 資料為 ${dataDate} 交易日 (非今日)`;
                 warningEl.className = 'data-date-warning yesterday';
             }
         }
@@ -176,8 +179,7 @@
                 allStocksData = data.stocks;
                 document.getElementById('update-time').innerText = '最後更新：' + data.updated_at;
 
-                // 新增：顯示資料日期與提醒
-                showDataDateWarning(data.data_date);
+                showDataDateWarning(data.data_date, data.today_updated_count);
 
                 document.getElementById('total-scanned').innerText = data.total_valid_stocks || allStocksData.length;
 
@@ -201,6 +203,11 @@
             allStocksData.forEach(stock => {
                 let isMatch = false;
                 let lastColValue = "符合";
+
+                // 只篩選今天更新的股票
+                if (!stock.date || stock.date !== todayStr) {
+                    return; // 不顯示非今日資料的股票
+                }
 
                 if (currentStrategy === 1) {
                     isMatch = (
@@ -246,6 +253,7 @@
                         <td class="hide-on-mobile"><span class="market-badge ${marketClass}">${stock.market}</span></td>
                         <td style="color:#d32f2f; font-weight:bold;">${stock.close}</td>
                         <td>${stock.volume}</td>
+                        <td class="hide-on-mobile">${stock.date}</td>
                         <td class="hide-on-mobile">${stock.ma5}</td>
                         <td class="hide-on-mobile">${stock.ma20}</td>
                         <td class="hide-on-mobile">${stock.ma60}</td>
@@ -259,9 +267,9 @@
             document.getElementById('stock-count').innerText = count;
 
             if (count === 0 && currentStrategy > 2) {
-                tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 20px; color:#666;">策略待更新...</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 20px; color:#666;">策略待更新...</td></tr>';
             } else if (count === 0 && (currentStrategy === 1 || currentStrategy === 2)) {
-                tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 20px; color:#666;">今日無符合此策略條件之個股</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 20px; color:#666;">今日無符合此策略條件之個股</td></tr>';
             }
         }
 
