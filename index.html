@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -32,8 +31,6 @@
         .market-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: white; }
         .badge-twse { background-color: #0288d1; }
         .badge-tpex { background-color: #f57c00; }
-        .old-data { background-color: #fff3cd !important; opacity: 0.7; }
-        .old-date { color: #856404; font-size: 11px; }
         .loading { text-align: center; font-size: 18px; color: #666; padding: 40px; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
         @media (max-width: 768px) { th, td { padding: 8px 5px; font-size: 14px; } .hide-on-mobile { display: none; } }
@@ -92,14 +89,13 @@
                 <th id="dynamic-col">200MA連揚</th>
             </tr>
         </thead>
-        <tbody id="table-body">
-        </tbody>
+        <tbody id="table-body"></tbody>
     </table>
 
     <script>
         let allStocksData = [];
         let currentStrategy = 1;
-        const todayStr = new Date().toISOString().split('T')[0];
+        let currentDataDate = null;
 
         function toggleExplanation() {
             const box = document.getElementById("strategy-explanation");
@@ -108,6 +104,8 @@
 
         function showDataDateWarning(dataDate, todayUpdatedCount) {
             const warningEl = document.getElementById('data-date-info');
+            const taipeiNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+            const taipeiToday = `${taipeiNow.getFullYear()}-${String(taipeiNow.getMonth() + 1).padStart(2, '0')}-${String(taipeiNow.getDate()).padStart(2, '0')}`;
 
             if (!dataDate) {
                 warningEl.innerHTML = '⚠️ 無法判斷資料交易日期';
@@ -115,11 +113,11 @@
                 return;
             }
 
-            if (dataDate === todayStr) {
+            if (dataDate === taipeiToday) {
                 warningEl.innerHTML = `✅ 資料為今天交易日 (更新 ${todayUpdatedCount || 0} 檔)`;
                 warningEl.className = 'data-date-warning today';
             } else {
-                warningEl.innerHTML = `⚠️ 資料為 ${dataDate} 交易日 (非今日)`;
+                warningEl.innerHTML = `⚠️ 資料為 ${dataDate} 交易日（非今日）`;
                 warningEl.className = 'data-date-warning yesterday';
             }
         }
@@ -176,18 +174,17 @@
                 const response = await fetch('all_stocks_data.json?t=' + new Date().getTime());
                 const data = await response.json();
 
-                allStocksData = data.stocks;
-                document.getElementById('update-time').innerText = '最後更新：' + data.updated_at;
+                allStocksData = data.stocks || [];
+                currentDataDate = data.data_date || null;
 
+                document.getElementById('update-time').innerText = '最後更新：' + (data.updated_at || '未知');
                 showDataDateWarning(data.data_date, data.today_updated_count);
-
                 document.getElementById('total-scanned').innerText = data.total_valid_stocks || allStocksData.length;
 
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('stock-table').style.display = 'table';
 
                 renderTable();
-
             } catch (error) {
                 console.error('讀取資料失敗:', error);
                 document.getElementById('loading').innerText = '資料載入失敗，請確認是否已至 GitHub Actions 重新執行抓取。';
@@ -201,13 +198,12 @@
             let count = 0;
 
             allStocksData.forEach(stock => {
+                if (!stock.date || !currentDataDate || stock.date !== currentDataDate) {
+                    return;
+                }
+
                 let isMatch = false;
                 let lastColValue = "符合";
-
-                // 只篩選今天更新的股票
-                if (!stock.date || stock.date !== todayStr) {
-                    return; // 不顯示非今日資料的股票
-                }
 
                 if (currentStrategy === 1) {
                     isMatch = (
@@ -219,22 +215,21 @@
                         stock.close < (stock.ma200 * 1.4) &&
                         stock.ma200_up_10days === true
                     );
-                } 
-                else if (currentStrategy === 2) {
+                } else if (currentStrategy === 2) {
                     if (stock.k_value !== undefined) {
                         isMatch = (
-                            stock.close > stock.ma60 &&                           
-                            stock.ma20 > stock.ma20_yesterday &&                  
-                            stock.has_vol_burst_10d === true &&                   
-                            stock.has_price_burst_10d === true &&                 
-                            stock.close < stock.highestClose5 &&                  
-                            stock.close > stock.ma20 &&                           
-                            stock.bias20 < 3.0 &&                                 
-                            stock.volume < stock.vol_ma5 &&                       
-                            stock.volume < (stock.max_vol_10d * 0.5) &&           
-                            stock.k_value < 60                                    
+                            stock.close > stock.ma60 &&
+                            stock.ma20 > stock.ma20_yesterday &&
+                            stock.has_vol_burst_10d === true &&
+                            stock.has_price_burst_10d === true &&
+                            stock.close < stock.highestClose5 &&
+                            stock.close > stock.ma20 &&
+                            stock.bias20 < 3.0 &&
+                            stock.volume < stock.vol_ma5 &&
+                            stock.volume < (stock.max_vol_10d * 0.5) &&
+                            stock.k_value < 60
                         );
-                        lastColValue = `K: ${stock.k_value}`; 
+                        lastColValue = `K: ${stock.k_value}`;
                     }
                 }
 
@@ -269,7 +264,7 @@
             if (count === 0 && currentStrategy > 2) {
                 tableBody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 20px; color:#666;">策略待更新...</td></tr>';
             } else if (count === 0 && (currentStrategy === 1 || currentStrategy === 2)) {
-                tableBody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 20px; color:#666;">今日無符合此策略條件之個股</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 20px; color:#666;">目前資料日期無符合此策略條件之個股</td></tr>';
             }
         }
 
