@@ -9,33 +9,60 @@ import pytz
 DB_FILE = "historical_prices.json"
 OUTPUT_FILE = "all_stocks_data.json"
 
+def roc_to_ad_date(roc_date_str):
+    s = str(roc_date_str).strip()
+    if len(s) == 7 and s.isdigit():
+        year = int(s[:3]) + 1911
+        month = s[3:5]
+        day = s[5:7]
+        return f"{year}-{month}-{day}"
+    return None
+
 def get_today_quotes():
     today_data = {}
-    today_str = datetime.now(tz=pytz.timezone("Asia/Taipei")).strftime("%Y-%m-%d")
-    
+    api_data_date = None
+
     try:
         res = requests.get("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL", timeout=15)
         for item in res.json():
             code = str(item.get("Code", "")).strip()
             close = str(item.get("ClosingPrice", "")).replace(',', '')
             vol = str(item.get("TradeVolume", "")).replace(',', '')
-            if close and vol and close.replace('.', '', 1).isdigit() and len(code) == 4:
-                today_data[code] = {"close": float(close), "volume": float(vol) / 1000}
+            roc_date = str(item.get("Date", "")).strip()
+            ad_date = roc_to_ad_date(roc_date)
+
+            if ad_date and api_data_date is None:
+                api_data_date = ad_date
+
+            if close and vol and close.replace('.', '', 1).isdigit() and len(code) == 4 and ad_date:
+                today_data[code] = {
+                    "close": float(close),
+                    "volume": float(vol) / 1000,
+                    "date": ad_date
+                }
     except Exception as e:
         print(f"獲取上市今日行情失敗: {e}")
 
     try:
         res = requests.get("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes", timeout=15)
-        for item in res.json():
+        tpex_data = res.json()
+        taipei_today = datetime.now(tz=pytz.timezone("Asia/Taipei")).strftime("%Y-%m-%d")
+
+        for item in tpex_data:
             code = str(item.get("SecuritiesCompanyCode", "")).strip()
             close = str(item.get("Close", "")).replace(',', '')
             vol = str(item.get("TradingShares", "")).replace(',', '')
+
             if close and vol and close.replace('.', '', 1).isdigit() and len(code) == 4:
-                today_data[code] = {"close": float(close), "volume": float(vol) / 1000}
+                today_data[code] = {
+                    "close": float(close),
+                    "volume": float(vol) / 1000,
+                    "date": taipei_today
+                }
     except Exception as e:
         print(f"獲取上櫃今日行情失敗: {e}")
 
-    return today_data, today_str
+    return today_data, api_data_date
 
 def infer_actual_data_date(db):
     latest_dates = []
@@ -83,33 +110,40 @@ def main():
     with open(DB_FILE, "r", encoding="utf-8") as f:
         db = json.load(f)
 
-    today_quotes, today_str = get_today_quotes()
+    today_quotes, api_data_date = get_today_quotes()
     if not today_quotes:
         print("今日無資料或 API 異常，結束更新。")
         return
 
+    taipei_today = datetime.now(tz=pytz.timezone("Asia/Taipei")).strftime("%Y-%m-%d")
+    print(f"台北今天日期: {taipei_today}")
+    print(f"TWSE API 資料日期: {api_data_date}")
+
     all_stocks_result = []
     updated_count = 0
-    today_updated_codes = set()
+    updated_dates = set()
 
     for code, info in db.items():
         if code in today_quotes:
             new_quote = today_quotes[code]
-            if info["history"] and info["history"][-1]["date"] == today_str:
+            quote_date = new_quote["date"]
+
+            if info["history"] and info["history"][-1]["date"] == quote_date:
                 info["history"][-1] = {
-                    "date": today_str,
+                    "date": quote_date,
                     "close": new_quote["close"],
                     "volume": new_quote["volume"]
                 }
             else:
                 info["history"].append({
-                    "date": today_str,
+                    "date": quote_date,
                     "close": new_quote["close"],
                     "volume": new_quote["volume"]
                 })
+
             info["history"] = info["history"][-250:]
             updated_count += 1
-            today_updated_codes.add(code)
+            updated_dates.add(quote_date)
 
         history = info["history"]
         if len(history) < 220:
@@ -180,12 +214,12 @@ def main():
     tw_tz = pytz.timezone("Asia/Taipei")
     tw_now = datetime.now(tz=tw_tz)
 
-    actual_data_date = today_str if len(today_updated_codes) > 0 else infer_actual_data_date(db)
+    actual_data_date = max(updated_dates) if updated_dates else infer_actual_data_date(db)
 
     output_data = {
         "updated_at": tw_now.strftime("%Y-%m-%d %H:%M:%S CST"),
         "data_date": actual_data_date,
-        "today_updated_count": len(today_updated_codes),
+        "today_updated_count": updated_count,
         "total_valid_stocks": len(all_stocks_result),
         "stocks": all_stocks_result
     }
@@ -194,7 +228,7 @@ def main():
         json.dump(output_data, f, ensure_ascii=False, indent=2)
 
     print("=== 更新完成 ===")
-    print(f"今天成功更新 {len(today_updated_codes)} 檔股票")
+    print(f"更新股票數: {updated_count}")
     print(f"實際資料日期: {actual_data_date}")
     print(f"成功儲存 {len(all_stocks_result)} 檔符合天數的股票指標！")
 
