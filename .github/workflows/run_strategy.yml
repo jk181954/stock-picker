@@ -2,7 +2,7 @@ name: Daily Stock Scanner (V2)
 
 on:
   schedule:
-    - cron: '30 8 * * 1-5' # UTC 08:30 = 台灣時間 16:30
+    - cron: '30 8 * * 1-5' # UTC 08:30 = 台灣時間下午 16:30
   workflow_dispatch:
 
 permissions:
@@ -11,6 +11,8 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Taipei
 
     steps:
       - name: Checkout repository
@@ -24,10 +26,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run Python script
+      - name: Run Python script (極速增量版)
         env:
           PYTHONUNBUFFERED: "1"
-          TZ: Asia/Taipei
         run: python update_stocks.py
 
       - name: Commit and push changes
