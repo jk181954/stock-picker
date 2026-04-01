@@ -2,8 +2,8 @@ name: Daily Stock Scanner (V2)
 
 on:
   schedule:
-    - cron: '30 8 * * 1-5' # UTC 08:30 = 台灣時間下午 16:30
-  workflow_dispatch:
+    - cron: '30 8 * * 1-5'  # UTC 08:30 = 台灣時間下午 16:30
+  workflow_dispatch:  # 手動按鈕
 
 permissions:
   contents: write
@@ -11,8 +11,6 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    env:
-      TZ: Asia/Taipei
 
     steps:
       - name: Checkout repository
@@ -36,4 +34,4 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add all_stocks_data.json historical_prices.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Daily update: stock prices and indicators $(date '+%Y-%m-%d %H:%M:%S %Z')" && git push)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Daily update: stock prices and indicators $(date)" && git push)
