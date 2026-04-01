@@ -1,274 +1,225 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台股技術面選股系統</title>
-    <style>
-        body { font-family: "Microsoft JhengHei", Arial, sans-serif; background-color: #f0f2f5; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; }
-        h1 { text-align: center; color: #1a237e; }
-        .top-actions { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; }
-        .btn-link { padding: 10px 20px; background-color: #1a237e; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; text-decoration: none; transition: all 0.2s; }
-        .btn-link:hover { background-color: #0d47a1; }
-        .btn-green { background-color: #198754; }
-        .btn-green:hover { background-color: #157347; }
-        .strategy-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; justify-content: center; }
-        .tab-btn { padding: 10px 15px; background-color: #e0e0e0; color: #555; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; transition: all 0.3s; }
-        .tab-btn.active { background-color: #d32f2f; color: white; box-shadow: 0 2px 4px rgba(211,47,47,0.3); }
-        .explanation-box { background-color: #ffffff; border-left: 5px solid #198754; border-radius: 6px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: none; animation: fadeIn 0.3s; }
-        .explanation-box h3 { margin-top: 0; color: #198754; }
-        .explanation-box ul { margin-bottom: 0; line-height: 1.6; }
-        .info-panel { background-color: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center; font-size: 16px; }
-        .update-time { color: #666; font-size: 14px; margin-top: 5px; }
-        .data-date-warning { margin-top: 8px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; font-size: 14px; }
-        .data-date-warning.yesterday { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
-        .data-date-warning.today { background-color: #d4edda; border-color: #c3e6cb; color: #155724; }
-        table { width: 100%; border-collapse: collapse; background-color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
-        th, td { padding: 12px 10px; text-align: center; border-bottom: 1px solid #ddd; }
-        th { background-color: #1a237e; color: white; }
-        tr:hover { background-color: #f5f5f5; }
-        .pass { color: #d32f2f; font-weight: bold; }
-        .market-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: white; }
-        .badge-twse { background-color: #0288d1; }
-        .badge-tpex { background-color: #f57c00; }
-        .loading { text-align: center; font-size: 18px; color: #666; padding: 40px; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
-        @media (max-width: 768px) { th, td { padding: 8px 5px; font-size: 14px; } .hide-on-mobile { display: none; } }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>台股選股器</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: #f5f7fb;
+      color: #222;
+    }
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .header {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+    }
+    h1 {
+      margin: 0 0 12px 0;
+      font-size: 28px;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 14px;
+      color: #555;
+    }
+    .meta-item {
+      background: #eef3ff;
+      border-radius: 999px;
+      padding: 8px 12px;
+    }
+    .warning {
+      margin-top: 12px;
+      color: #b45309;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .ok {
+      color: #047857;
+    }
+    .section {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      background: #fff;
+    }
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: center;
+      font-size: 14px;
+    }
+    th {
+      background: #f8fafc;
+      position: sticky;
+      top: 0;
+    }
+    .muted {
+      color: #6b7280;
+      font-size: 13px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .badge-match {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .badge-old {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    @media (max-width: 768px) {
+      body {
+        padding: 12px;
+      }
+      th, td {
+        font-size: 12px;
+        padding: 8px 4px;
+      }
+      h1 {
+        font-size: 22px;
+      }
+    }
+  </style>
 </head>
 <body>
-
-    <h1>📈 台股技術面選股系統</h1>
-
-    <div class="top-actions">
-        <a href="https://jk181954.github.io/Data/" target="_blank" class="btn-link">📊 前往台股籌碼</a>
-        <button onclick="toggleExplanation()" class="btn-link btn-green">📝 策略條件說明</button>
+  <div class="wrap">
+    <div class="header">
+      <h1>台股選股器</h1>
+      <div class="meta">
+        <div class="meta-item">系統更新時間：<span id="updatedAt">讀取中...</span></div>
+        <div class="meta-item">目標資料日：<span id="targetDate">讀取中...</span></div>
+        <div class="meta-item">實際資料日：<span id="dataDate">讀取中...</span></div>
+        <div class="meta-item">有效股票數：<span id="totalStocks">讀取中...</span></div>
+        <div class="meta-item">FinMind 補資料數：<span id="fallbackCount">讀取中...</span></div>
+      </div>
+      <div id="dateWarning" class="warning"></div>
     </div>
 
-    <div id="strategy-explanation" class="explanation-box">
-        <h3 id="exp-title">💡 策略 1：量縮測底完成 說明</h3>
-        <ul id="exp-content">
-            <li>收盤價 > 5日、20日、60日均線</li>
-            <li>20日最低收盤價 < 20日最低20MA (代表曾回測破線)</li>
-            <li>成交張數 > 500 張</li>
-            <li>收盤價 < 200日均線 × 1.4 (限制乖離)</li>
-            <li>200日均線 (年線) 連續 10 日上升</li>
-        </ul>
-    </div>
-
-    <div class="strategy-tabs">
-        <button class="tab-btn active" onclick="switchStrategy(1, this)">1. 量縮測底完成</button>
-        <button class="tab-btn" onclick="switchStrategy(2, this)">2. 空轉多拉回</button>
-        <button class="tab-btn" onclick="switchStrategy(3, this)">3. 待更新</button>
-        <button class="tab-btn" onclick="switchStrategy(4, this)">4. 待更新</button>
-        <button class="tab-btn" onclick="switchStrategy(5, this)">5. 待更新</button>
-    </div>
-
-    <div class="info-panel">
-        <div style="margin-bottom: 8px;">總計掃描市場上：<span id="total-scanned" style="color:#1a237e; font-weight:bold;">0</span> 檔股票</div>
-        <div>目前符合 [<span id="current-strategy-name">1. 量縮測底完成</span>] 的股票總數：<span id="stock-count" style="color:#d32f2f; font-weight:bold; font-size:20px;">0</span> 檔</div>
-        <div id="update-time" class="update-time">資料更新時間：載入中...</div>
-        <div id="data-date-info" class="data-date-warning"></div>
-    </div>
-
-    <div id="loading" class="loading">資料載入中，請稍候...</div>
-
-    <table id="stock-table" style="display: none;">
+    <div class="section">
+      <div class="muted">僅顯示與目標資料日一致的股票，避免混入昨天舊資料。</div>
+      <table>
         <thead>
-            <tr>
-                <th>代號</th>
-                <th>名稱</th>
-                <th class="hide-on-mobile">市場</th>
-                <th>收盤價</th>
-                <th>成交量</th>
-                <th class="hide-on-mobile">資料日</th>
-                <th class="hide-on-mobile">5MA</th>
-                <th class="hide-on-mobile">20MA</th>
-                <th class="hide-on-mobile">60MA</th>
-                <th class="hide-on-mobile">200MA</th>
-                <th id="dynamic-col">200MA連揚</th>
-            </tr>
+          <tr>
+            <th>代碼</th>
+            <th>名稱</th>
+            <th>市場</th>
+            <th>資料日</th>
+            <th>狀態</th>
+            <th>收盤價</th>
+            <th>成交量</th>
+            <th>MA20</th>
+            <th>MA60</th>
+            <th>K值</th>
+          </tr>
         </thead>
-        <tbody id="table-body"></tbody>
-    </table>
+        <tbody id="stockTableBody"></tbody>
+      </table>
+    </div>
+  </div>
 
-    <script>
-        let allStocksData = [];
-        let currentStrategy = 1;
-        let currentDataDate = null;
+  <script>
+    function renderWarning(targetDate, dataDate, fallbackCount) {
+      const warningEl = document.getElementById('dateWarning');
 
-        function toggleExplanation() {
-            const box = document.getElementById("strategy-explanation");
-            box.style.display = (box.style.display === "none" || box.style.display === "") ? "block" : "none";
-        }
+      if (!targetDate || !dataDate) {
+        warningEl.textContent = '目前無法判定資料日期。';
+        warningEl.className = 'warning';
+        return;
+      }
 
-        function showDataDateWarning(dataDate, todayUpdatedCount) {
-            const warningEl = document.getElementById('data-date-info');
-            const taipeiNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
-            const taipeiToday = `${taipeiNow.getFullYear()}-${String(taipeiNow.getMonth() + 1).padStart(2, '0')}-${String(taipeiNow.getDate()).padStart(2, '0')}`;
+      if (targetDate === dataDate) {
+        warningEl.innerHTML = `目前資料已對齊目標資料日 <span class="ok">${targetDate}</span>。FinMind 補資料數：${fallbackCount ?? 0}`;
+        warningEl.className = 'warning ok';
+      } else {
+        warningEl.textContent = `目前目標資料日為 ${targetDate}，但實際最新資料日為 ${dataDate}，代表部分股票可能尚未更新完成。`;
+        warningEl.className = 'warning';
+      }
+    }
 
-            if (!dataDate) {
-                warningEl.innerHTML = '⚠️ 無法判斷資料交易日期';
-                warningEl.className = 'data-date-warning';
-                return;
-            }
+    function renderTable(stocks, targetDate) {
+      const tbody = document.getElementById('stockTableBody');
+      tbody.innerHTML = '';
 
-            if (dataDate === taipeiToday) {
-                warningEl.innerHTML = `✅ 資料為今天交易日 (更新 ${todayUpdatedCount || 0} 檔)`;
-                warningEl.className = 'data-date-warning today';
-            } else {
-                warningEl.innerHTML = `⚠️ 資料為 ${dataDate} 交易日（非今日）`;
-                warningEl.className = 'data-date-warning yesterday';
-            }
-        }
+      const filtered = (stocks || []).filter(stock => stock.date === targetDate);
 
-        function switchStrategy(strategyId, btnElement) {
-            currentStrategy = strategyId;
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            btnElement.classList.add('active');
+      for (const stock of filtered.slice(0, 100)) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${stock.code ?? ''}</td>
+          <td>${stock.name ?? ''}</td>
+          <td>${stock.market ?? ''}</td>
+          <td>${stock.date ?? ''}</td>
+          <td><span class="badge badge-match">最新</span></td>
+          <td>${stock.close ?? ''}</td>
+          <td>${stock.volume ?? ''}</td>
+          <td>${stock.ma20 ?? ''}</td>
+          <td>${stock.ma60 ?? ''}</td>
+          <td>${stock.k_value ?? ''}</td>
+        `;
+        tbody.appendChild(tr);
+      }
 
-            const strategyNames = {
-                1: "1. 量縮測底完成",
-                2: "2. 空轉多拉回",
-                3: "3. 待更新",
-                4: "4. 待更新",
-                5: "5. 待更新"
-            };
-            document.getElementById('current-strategy-name').innerText = strategyNames[strategyId];
+      if (filtered.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="10">目前沒有符合目標資料日 ${targetDate} 的股票資料。</td>`;
+        tbody.appendChild(tr);
+      }
+    }
 
-            const expTitle = document.getElementById('exp-title');
-            const expContent = document.getElementById('exp-content');
-            const dynamicCol = document.getElementById('dynamic-col');
+    async function loadStockData() {
+      try {
+        const response = await fetch('./all_stocks_data.json');
+        const data = await response.json();
 
-            if (strategyId === 1) {
-                expTitle.innerText = "💡 策略 1：量縮測底完成 說明";
-                expContent.innerHTML = `
-                    <li>收盤價 > 5日、20日、60日均線</li>
-                    <li>20日最低收盤價 < 20日最低20MA (代表曾回測破線)</li>
-                    <li>成交張數 > 500 張</li>
-                    <li>收盤價 < 200日均線 × 1.4 (限制乖離)</li>
-                    <li>200日均線 (年線) 連續 10 日上升</li>`;
-                dynamicCol.innerText = "200MA連揚";
-            } else if (strategyId === 2) {
-                expTitle.innerText = "💡 策略 2：空轉多拉回 說明";
-                expContent.innerHTML = `
-                    <li>1. 今日收盤價 > 60日均線 & 20日均線</li>
-                    <li>2. 20日均線 > 昨日20日均線 (月線翻揚)</li>
-                    <li>3. 近10日內至少1日出量 (大於20日均量2倍) 且至少1日漲幅 > 5%</li>
-                    <li>4. 今日收盤價 < 近5日最高價 (代表有拉回)</li>
-                    <li>5. 今日收盤價距20日均線乖離率 < 3%</li>
-                    <li>6. 今日成交量 < 5日均量 & < 近10日最大量的 50% (量縮)</li>
-                    <li>7. KD 的 K 值 < 60</li>`;
-                dynamicCol.innerText = "KD指標(K)";
-            } else {
-                expTitle.innerText = `💡 策略 ${strategyId}：待更新`;
-                expContent.innerHTML = `<li>此策略尚未開放，敬請期待。</li>`;
-                dynamicCol.innerText = "備註";
-            }
+        const updatedAt = data.updated_at ?? '未知';
+        const targetDate = data.target_date ?? data.data_date ?? '未知';
+        const dataDate = data.data_date ?? '未知';
+        const totalStocks = data.total_valid_stocks ?? 0;
+        const fallbackCount = data.fallback_updated_count ?? 0;
 
-            renderTable();
-        }
+        document.getElementById('updatedAt').textContent = updatedAt;
+        document.getElementById('targetDate').textContent = targetDate;
+        document.getElementById('dataDate').textContent = dataDate;
+        document.getElementById('totalStocks').textContent = totalStocks;
+        document.getElementById('fallbackCount').textContent = fallbackCount;
 
-        async function fetchData() {
-            try {
-                const response = await fetch('all_stocks_data.json?t=' + new Date().getTime());
-                const data = await response.json();
+        renderWarning(targetDate, dataDate, fallbackCount);
+        renderTable(data.stocks ?? [], targetDate);
+      } catch (error) {
+        document.getElementById('updatedAt').textContent = '載入失敗';
+        document.getElementById('targetDate').textContent = '載入失敗';
+        document.getElementById('dataDate').textContent = '載入失敗';
+        document.getElementById('totalStocks').textContent = '載入失敗';
+        document.getElementById('fallbackCount').textContent = '載入失敗';
+        document.getElementById('dateWarning').textContent = '無法載入 all_stocks_data.json';
+        console.error(error);
+      }
+    }
 
-                allStocksData = data.stocks || [];
-                currentDataDate = data.data_date || null;
-
-                document.getElementById('update-time').innerText = '最後更新：' + (data.updated_at || '未知');
-                showDataDateWarning(data.data_date, data.today_updated_count);
-                document.getElementById('total-scanned').innerText = data.total_valid_stocks || allStocksData.length;
-
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('stock-table').style.display = 'table';
-
-                renderTable();
-            } catch (error) {
-                console.error('讀取資料失敗:', error);
-                document.getElementById('loading').innerText = '資料載入失敗，請確認是否已至 GitHub Actions 重新執行抓取。';
-                document.getElementById('loading').style.color = 'red';
-            }
-        }
-
-        function renderTable() {
-            const tableBody = document.getElementById('table-body');
-            tableBody.innerHTML = '';
-            let count = 0;
-
-            allStocksData.forEach(stock => {
-                if (!stock.date || !currentDataDate || stock.date !== currentDataDate) {
-                    return;
-                }
-
-                let isMatch = false;
-                let lastColValue = "符合";
-
-                if (currentStrategy === 1) {
-                    isMatch = (
-                        stock.close > stock.ma5 &&
-                        stock.close > stock.ma20 &&
-                        stock.close > stock.ma60 &&
-                        stock.lowestClose20 < stock.ma20 &&
-                        stock.volume > 500 &&
-                        stock.close < (stock.ma200 * 1.4) &&
-                        stock.ma200_up_10days === true
-                    );
-                } else if (currentStrategy === 2) {
-                    if (stock.k_value !== undefined) {
-                        isMatch = (
-                            stock.close > stock.ma60 &&
-                            stock.ma20 > stock.ma20_yesterday &&
-                            stock.has_vol_burst_10d === true &&
-                            stock.has_price_burst_10d === true &&
-                            stock.close < stock.highestClose5 &&
-                            stock.close > stock.ma20 &&
-                            stock.bias20 < 3.0 &&
-                            stock.volume < stock.vol_ma5 &&
-                            stock.volume < (stock.max_vol_10d * 0.5) &&
-                            stock.k_value < 60
-                        );
-                        lastColValue = `K: ${stock.k_value}`;
-                    }
-                }
-
-                if (isMatch) {
-                    count++;
-                    const marketClass = stock.market === '上市' ? 'badge-twse' : 'badge-tpex';
-                    const tr = document.createElement('tr');
-
-                    tr.innerHTML = `
-                        <td>
-                            <a href="https://www.wantgoo.com/stock/${stock.code}/technical-chart" target="_blank" style="color:#0d6efd; text-decoration:none; font-weight:bold;">
-                                ${stock.code}
-                            </a>
-                        </td>
-                        <td style="font-weight:bold;">${stock.name}</td>
-                        <td class="hide-on-mobile"><span class="market-badge ${marketClass}">${stock.market}</span></td>
-                        <td style="color:#d32f2f; font-weight:bold;">${stock.close}</td>
-                        <td>${stock.volume}</td>
-                        <td class="hide-on-mobile">${stock.date}</td>
-                        <td class="hide-on-mobile">${stock.ma5}</td>
-                        <td class="hide-on-mobile">${stock.ma20}</td>
-                        <td class="hide-on-mobile">${stock.ma60}</td>
-                        <td class="hide-on-mobile">${stock.ma200}</td>
-                        <td class="pass">${lastColValue}</td>
-                    `;
-                    tableBody.appendChild(tr);
-                }
-            });
-
-            document.getElementById('stock-count').innerText = count;
-
-            if (count === 0 && currentStrategy > 2) {
-                tableBody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 20px; color:#666;">策略待更新...</td></tr>';
-            } else if (count === 0 && (currentStrategy === 1 || currentStrategy === 2)) {
-                tableBody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 20px; color:#666;">目前資料日期無符合此策略條件之個股</td></tr>';
-            }
-        }
-
-        window.onload = fetchData;
-    </script>
+    loadStockData();
+  </script>
 </body>
 </html>
