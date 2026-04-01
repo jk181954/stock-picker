@@ -1,7 +1,13 @@
 {
-  "updated_at": "2026-04-01 23:37:58 CST",
+  "updated_at": "2026-04-01 23:58:52 CST",
   "data_date": "2026-04-01",
   "today_updated_count": 1944,
+  "fallback_updated_count": 0,
+  "source_stats": {
+    "TWSE": 1075,
+    "TPEX": 869,
+    "FinMind": 0
+  },
   "total_valid_stocks": 1937,
   "stocks": [
     {
