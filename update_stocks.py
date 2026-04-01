@@ -11,6 +11,8 @@ OUTPUT_FILE = "all_stocks_data.json"
 
 def get_today_quotes():
     today_data = {}
+    today_str = datetime.now(tz=pytz.timezone("Asia/Taipei")).strftime("%Y-%m-%d")
+    
     try:
         res = requests.get("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL", timeout=15)
         for item in res.json():
@@ -33,7 +35,17 @@ def get_today_quotes():
     except Exception as e:
         print(f"獲取上櫃今日行情失敗: {e}")
 
-    return today_data
+    return today_data, today_str
+
+def infer_actual_data_date(db):
+    """從歷史資料推斷實際最新交易日"""
+    latest_dates = []
+    for code, info in db.items():
+        if "history" in info and info["history"]:
+            last_date = info["history"][-1].get("date")
+            if last_date:
+                latest_dates.append(last_date)
+    return max(latest_dates) if latest_dates else None
 
 def is_ma200_up_10days(ma200_list):
     if len(ma200_list) < 10: return False
@@ -73,12 +85,16 @@ def main():
     with open(DB_FILE, "r", encoding="utf-8") as f:
         db = json.load(f)
 
-    today_quotes = get_today_quotes()
+    today_quotes, today_str = get_today_quotes()
     if not today_quotes:
         print("今日無資料或 API 異常，結束更新。")
         return
         
-    today_str = datetime.now(tz=pytz.timezone("Asia/Taipei")).strftime("%Y-%m-%d")
+    # 推斷實際資料日期（可能比今天早）
+    actual_data_date = infer_actual_data_date(db)
+    print(f"推斷資料日期: {actual_data_date}")
+    print(f"程式執行日期: {today_str}")
+        
     all_stocks_result = []
     updated_count = 0
 
@@ -171,6 +187,7 @@ def main():
 
     output_data = {
         "updated_at": tw_now.strftime("%Y-%m-%d %H:%M:%S CST"),
+        "data_date": actual_data_date,  # 新增：實際資料交易日
         "total_valid_stocks": len(all_stocks_result),
         "stocks": all_stocks_result
     }
@@ -179,6 +196,7 @@ def main():
 
     print(f"=== 更新完成 ===")
     print(f"今天共更新 {updated_count} 檔股票價格")
+    print(f"實際資料日期: {actual_data_date}")
     print(f"成功儲存 {len(all_stocks_result)} 檔符合天數的股票指標！")
 
 if __name__ == "__main__":
