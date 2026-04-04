@@ -11,16 +11,22 @@ OUTPUT_FILE = "all_stocks_data.json"
 
 def get_today_quotes():
     today_data = {}
-    today_str = datetime.now(tz=pytz.timezone("Asia/Taipei")).strftime("%Y-%m-%d")
+    tw_today = datetime.now(tz=pytz.timezone("Asia/Taipei")).strftime("%Y-%m-%d")
+    actual_date = None  # ✅ 從 API 取得實際交易日
 
     try:
         res = requests.get("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL", timeout=15)
-        for item in res.json():
+        items = res.json()
+        for item in items:
             code = str(item.get("Code", "")).strip()
             close = str(item.get("ClosingPrice", "")).replace(',', '')
             vol = str(item.get("TradeVolume", "")).replace(',', '')
+            date_str = str(item.get("Date", "")).strip()  # ✅ 格式如 "20260402"
             if close and vol and close.replace('.', '', 1).isdigit() and len(code) == 4:
                 today_data[code] = {"close": float(close), "volume": float(vol) / 1000}
+                # ✅ 只取第一筆有效日期
+                if actual_date is None and len(date_str) == 8:
+                    actual_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"
     except Exception as e:
         print(f"獲取上市今日行情失敗: {e}")
 
@@ -30,22 +36,23 @@ def get_today_quotes():
             code = str(item.get("SecuritiesCompanyCode", "")).strip()
             close = str(item.get("Close", "")).replace(',', '')
             vol = str(item.get("TradingShares", "")).replace(',', '')
+            date_str = str(item.get("Date", "")).strip()  # ✅ 格式如 "115/04/02"
             if close and vol and close.replace('.', '', 1).isdigit() and len(code) == 4:
                 today_data[code] = {"close": float(close), "volume": float(vol) / 1000}
+                # ✅ 若上市沒取到日期，從上櫃補
+                if actual_date is None and "/" in date_str:
+                    parts = date_str.split("/")
+                    if len(parts) == 3:
+                        year = int(parts[0]) + 1911
+                        actual_date = f"{year}-{parts[1].zfill(2)}-{parts[2].zfill(2)}"
     except Exception as e:
         print(f"獲取上櫃今日行情失敗: {e}")
 
-    return today_data, today_str
+    # ✅ 若 API 都沒有日期欄位，fallback 用程式執行日
+    if actual_date is None:
+        actual_date = tw_today
 
-def infer_actual_data_date(db):
-    """從歷史資料推斷實際最新交易日"""
-    latest_dates = []
-    for code, info in db.items():
-        if "history" in info and info["history"]:
-            last_date = info["history"][-1].get("date")
-            if last_date:
-                latest_dates.append(last_date)
-    return max(latest_dates) if latest_dates else None
+    return today_data, actual_date
 
 def is_ma200_up_10days(ma200_list):
     if len(ma200_list) < 10: return False
@@ -80,15 +87,13 @@ def main():
     with open(DB_FILE, "r", encoding="utf-8") as f:
         db = json.load(f)
 
-    today_quotes, today_str = get_today_quotes()
+    # ✅ get_today_quotes 現在回傳實際交易日
+    today_quotes, actual_data_date = get_today_quotes()
     if not today_quotes:
         print("今日無資料或 API 異常，結束更新。")
         return
 
-    # ✅ 修正：在寫入今日行情【之前】先推斷實際資料日期
-    actual_data_date = infer_actual_data_date(db)
-    print(f"推斷資料日期: {actual_data_date}")
-    print(f"程式執行日期: {today_str}")
+    print(f"API 實際交易日期: {actual_data_date}")
 
     all_stocks_result = []
     updated_count = 0
@@ -96,10 +101,10 @@ def main():
     for code, info in db.items():
         if code in today_quotes:
             new_quote = today_quotes[code]
-            if info["history"] and info["history"][-1]["date"] == today_str:
-                info["history"][-1] = {"date": today_str, "close": new_quote["close"], "volume": new_quote["volume"]}
+            if info["history"] and info["history"][-1]["date"] == actual_data_date:
+                info["history"][-1] = {"date": actual_data_date, "close": new_quote["close"], "volume": new_quote["volume"]}
             else:
-                info["history"].append({"date": today_str, "close": new_quote["close"], "volume": new_quote["volume"]})
+                info["history"].append({"date": actual_data_date, "close": new_quote["close"], "volume": new_quote["volume"]})
             info["history"] = info["history"][-250:]
             updated_count += 1
 
