@@ -99,9 +99,8 @@ def get_today_quotes():
     return today_data, actual_date
 
 
-def fetch_finmind(code, market, start_date, end_date, token=""):
+def fetch_finmind(code, start_date, end_date, token=""):
     """使用 FinMind 補齊指定股票的缺漏歷史資料"""
-    # FinMind 上市用原始代碼，上櫃也相同
     params = {
         "dataset": "TaiwanStockPrice",
         "data_id": code,
@@ -135,8 +134,8 @@ def fetch_finmind(code, market, start_date, end_date, token=""):
 
 def backfill_with_finmind(db, actual_data_date, token=""):
     """
-    掃描 db，找出仍落後 actual_data_date 的股票，用 FinMind 補齊。
-    只補缺漏的股票，不會對已更新的股票發出請求。
+    掃描 db，找出仍落後 actual_data_date 的股票（包含資料重複寫入的股票），
+    用 FinMind 補齊正確資料。
     """
     stale = []
     for code, info in db.items():
@@ -145,7 +144,7 @@ def backfill_with_finmind(db, actual_data_date, token=""):
             continue
         last_date = history[-1]["date"]
         if last_date < actual_data_date:
-            stale.append((code, info.get("market", "TWSE"), last_date))
+            stale.append((code, last_date))
 
     if not stale:
         print("✅ 所有股票已是最新，無需 FinMind 補齊。")
@@ -154,18 +153,23 @@ def backfill_with_finmind(db, actual_data_date, token=""):
     print(f"⚙️  FinMind 補齊開始，共 {len(stale)} 檔缺漏...")
     filled = 0
     skipped = 0
-    # 有 token 600 req/hr → 每 6 秒；無 token 300 req/hr → 每 12 秒
     sleep_sec = 6 if token else 12
 
-    for i, (code, market, last_date) in enumerate(stale):
+    for i, (code, last_date) in enumerate(stale):
         start_dt = (datetime.strptime(last_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-        new_rows = fetch_finmind(code, market, start_dt, actual_data_date, token=token)
+        new_rows = fetch_finmind(code, start_dt, actual_data_date, token=token)
 
         if new_rows:
             existing_dates = {r["date"] for r in db[code]["history"]}
             for row in new_rows:
                 if row["date"] not in existing_dates:
                     db[code]["history"].append(row)
+                else:
+                    # 若日期已存在但資料是舊的（重複寫入問題），用 FinMind 資料覆蓋
+                    for j, h in enumerate(db[code]["history"]):
+                        if h["date"] == row["date"]:
+                            db[code]["history"][j] = row
+                            break
             db[code]["history"] = sorted(db[code]["history"], key=lambda x: x["date"])[-250:]
             filled += 1
         else:
@@ -235,17 +239,34 @@ def main():
         return
 
     updated_count = 0
+    duplicate_skipped = 0  # 資料與前一日完全相同，疑似 API 未更新
+
     for code, info in db.items():
-        if code in today_quotes:
-            new_quote = today_quotes[code]
-            if info["history"] and info["history"][-1]["date"] == actual_data_date:
-                info["history"][-1] = {"date": actual_data_date, "close": new_quote["close"], "volume": new_quote["volume"]}
-            else:
-                info["history"].append({"date": actual_data_date, "close": new_quote["close"], "volume": new_quote["volume"]})
-            info["history"] = info["history"][-250:]
-            updated_count += 1
+        if code not in today_quotes:
+            continue
+
+        new_quote = today_quotes[code]
+        history = info["history"]
+
+        # ★ 防呆：今日報價與最後一筆完全相同 → API 尚未更新，跳過（留給 FinMind 補）
+        if history:
+            prev = history[-1]
+            if (round(prev["close"], 2) == round(new_quote["close"], 2) and
+                    round(prev["volume"], 2) == round(new_quote["volume"], 2)):
+                duplicate_skipped += 1
+                continue
+
+        if history and history[-1]["date"] == actual_data_date:
+            # 同日已存在 → 覆蓋更新
+            history[-1] = {"date": actual_data_date, "close": new_quote["close"], "volume": new_quote["volume"]}
+        else:
+            history.append({"date": actual_data_date, "close": new_quote["close"], "volume": new_quote["volume"]})
+
+        info["history"] = history[-250:]
+        updated_count += 1
 
     print(f"TPEX/TWSE 更新完成：{updated_count} 檔")
+    print(f"資料重複跳過（API 未更新）：{duplicate_skipped} 檔，將交由 FinMind 補齊")
 
     # --- STEP 2: FinMind 補齊仍缺漏的股票 ---
     finmind_token = os.environ.get("FINMIND_TOKEN", "")
